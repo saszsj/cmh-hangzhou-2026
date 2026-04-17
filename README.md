@@ -1,4 +1,10 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## QR → AI Demo Generator
+
+扫码进入表单，提交「我叫 / 行业 / 头疼问题」，系统生成一个可分享的解决方案 Demo 页面：
+
+- **入口**: `/new`
+- **结果页**: `/<slug>`（默认取“姓名拼音首字母”，冲突自动加数字）
+- **二维码**: `/api/qr?target=/new`
 
 ## Getting Started
 
@@ -16,21 +22,43 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Create `.env.local`:
 
-## Learn More
+```bash
+DATABASE_URL="postgres://..."
+OPENAI_API_KEY="sk-..."
+OPENAI_MODEL="gpt-4.1-mini"
+```
 
-To learn more about Next.js, take a look at the following resources:
+If `OPENAI_API_KEY` is not set, the app will fall back to a placeholder spec (still stores to DB).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Database (Neon / Postgres)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Generate migrations: `npm run db:generate`
+- Apply migrations (requires `DATABASE_URL`): `npm run db:migrate`
 
 ## Deploy on Vercel
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. Create a Vercel project from this repo.
+2. Set env vars in Vercel:
+   - `DATABASE_URL`
+   - `OPENAI_API_KEY`
+   - `OPENAI_MODEL` (optional)
+3. Run DB migrations once (from your machine or CI) against the Neon database:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+DATABASE_URL="..." npm run db:migrate
+```
+
+### Custom domain
+
+In Vercel → Project → Settings → Domains:
+
+- Add `cmh.zsj.fr`
+- Follow Vercel’s DNS instructions (typically a CNAME from `cmh` to Vercel)
+
+## Notes
+
+- The app **does not execute AI-generated arbitrary code**. It generates **validated JSON** and renders via a fixed set of widgets.

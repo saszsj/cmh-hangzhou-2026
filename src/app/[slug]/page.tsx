@@ -1,11 +1,30 @@
+import { eq } from "drizzle-orm";
+
 import DemoRenderer from "@/components/DemoRenderer";
+import { getDb } from "@/db/client";
+import { generatedPages } from "@/db/schema";
+import { demoSpecSchema } from "@/lib/demoSpec";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function DemoPage({ params }: PageProps) {
   const { slug } = await params;
+  let rows: { spec: unknown }[] = [];
+  let dbError: string | null = null;
+  try {
+    const db = getDb();
+    rows = await db
+      .select({ spec: generatedPages.spec })
+      .from(generatedPages)
+      .where(eq(generatedPages.slug, slug))
+      .limit(1);
+  } catch (e) {
+    dbError = e instanceof Error ? e.message : "Server error";
+  }
 
   return (
     <div className="flex flex-1 items-start justify-center bg-zinc-50 px-6 py-12 dark:bg-black">
@@ -15,32 +34,31 @@ export default async function DemoPage({ params }: PageProps) {
             Demo 链接：<span className="font-mono">/{slug}</span>
           </p>
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            解决方案 Demo（占位）
+            解决方案 Demo
           </h1>
-          <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-            目前这是页面骨架。下一步会接入数据库与 AI 生成内容，让该页面按 slug 拉取并渲染互动 Demo。
-          </p>
+          {dbError ? (
+            <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+              服务器暂未配置数据库（{dbError}）。请先在部署环境设置 <span className="font-mono">DATABASE_URL</span>。
+            </p>
+          ) : rows.length === 0 ? (
+            <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+              未找到该链接对应的内容。请从 <span className="font-mono">/new</span> 重新生成一次。
+            </p>
+          ) : null}
         </div>
 
         <div className="mt-8">
-          <DemoRenderer
-            spec={{
-              title: "样例：提升转化与复购",
-              summary: "这是一个占位示例，后续会由 AI 按你的输入生成。",
-              planSteps: [
-                { title: "明确目标与指标", detail: "定义 1 个北极星指标 + 3 个可执行指标。" },
-                { title: "设计 7 天行动表", detail: "把动作拆到每天，每天只做 1-2 件关键事。" },
-                { title: "做一个小闭环验证", detail: "先跑通 20 个客户的转化闭环，再复制放大。" },
-              ],
-              demoWidgets: [
-                {
-                  type: "checklist",
-                  title: "今日执行清单（示例）",
-                  items: ["梳理 3 个核心卖点", "写 1 版首句开场", "发 30 个私域触达"],
-                },
-              ],
-            }}
-          />
+          {dbError || rows.length === 0 ? null : (() => {
+              const parsed = demoSpecSchema.safeParse(rows[0]!.spec);
+              if (!parsed.success) {
+                return (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-100">
+                    生成内容格式异常，建议重新从 <span className="font-mono">/new</span> 生成一次。
+                  </div>
+                );
+              }
+              return <DemoRenderer spec={parsed.data} />;
+            })()}
         </div>
       </main>
     </div>

@@ -1,22 +1,7 @@
-type PlanStep = {
-  title: string;
-  detail: string;
-};
+import RoiCalculatorClient from "@/components/RoiCalculatorClient";
+import type { DemoSpec } from "@/lib/demoSpec";
 
-type ChecklistWidget = {
-  type: "checklist";
-  title: string;
-  items: string[];
-};
-
-type DemoWidget = ChecklistWidget;
-
-export type DemoSpec = {
-  title: string;
-  summary: string;
-  planSteps: PlanStep[];
-  demoWidgets: DemoWidget[];
-};
+type DemoWidget = DemoSpec["demoWidgets"][number];
 
 export default function DemoRenderer({ spec }: { spec: DemoSpec }) {
   return (
@@ -69,6 +54,9 @@ export default function DemoRenderer({ spec }: { spec: DemoSpec }) {
                 </ul>
               </div>
             );
+          }
+          if (w.type === "roiCalculator") {
+            return <RoiCalculatorClient key={`${w.type}-${idx}`} widget={w} />;
           }
           return null;
         })}

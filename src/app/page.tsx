@@ -32,6 +32,23 @@ export default function Home() {
           </a>
         </div>
 
+        <div className="mt-10 grid gap-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900/30 sm:grid-cols-[1fr_auto] sm:items-center">
+          <div>
+            <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-50">默认扫码入口</p>
+            <p className="mt-1 text-sm leading-6 text-zinc-700 dark:text-zinc-200">
+              把这个二维码放到海报/朋友圈，用户扫码直接进入 <span className="font-mono">/new</span> 填写信息。
+            </p>
+          </div>
+          <div className="w-fit rounded-xl bg-white p-3 shadow-sm dark:bg-zinc-950">
+            <img
+              src="/api/qr?target=/new"
+              alt="QR code to /new"
+              className="h-44 w-44"
+              loading="lazy"
+            />
+          </div>
+        </div>
+
         <div className="mt-8 rounded-xl bg-zinc-50 p-4 text-sm text-zinc-700 dark:bg-zinc-900/40 dark:text-zinc-200">
           <p className="font-semibold">下一步</p>
           <p className="mt-1">
