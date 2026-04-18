@@ -5,6 +5,8 @@ import { getDb } from "@/db/client";
 import type { DemoSpec } from "@/db/schema";
 import { generatedPages, submissions } from "@/db/schema";
 import { demoSpecSchema, ensureWidgetMix } from "@/lib/demoSpec";
+import { extractJsonObject } from "@/lib/extractJsonObject";
+import { repairAiDemoSpec } from "@/lib/repairAiDemoSpec";
 import { randomSlug } from "@/lib/slug";
 import { createSubmissionSchema } from "@/lib/validation";
 import OpenAI from "openai";
@@ -107,44 +109,93 @@ export async function POST(req: Request) {
         output: "DemoSpec JSON",
       };
 
-      const resp = await client.chat.completions.create({
-        model: process.env.OPENAI_MODEL ?? "gpt-4.1-mini",
-        temperature: 0.4,
-        messages: [
-          { role: "system", content: system },
-          {
-            role: "user",
-            content:
-              `请根据以下输入生成 DemoSpec JSON（严格遵守字段与类型）：\n` +
-              `${JSON.stringify(userPrompt, null, 2)}\n\n` +
-              `DemoSpec 结构要求：\n` +
-              `- title: string(<=80)\n` +
-              `- summary: string(<=600)，需体现与当下 AI 发展相匹配的解决思路\n` +
-              `- planSteps: [{title,detail}] (3-8项)，步骤之间要有递进（诊断→方案→试点→放大 等任选合适框架）\n` +
-              `- demoWidgets: 至少包含一个 checklist 和一个 roiCalculator\n` +
-              `其中 checklist: {type:'checklist', title, items[3..12]}，清单项尽量可执行、可与 AI 辅助环节挂钩\n` +
-              `roiCalculator: {type:'roiCalculator', title, fields[{label,key,defaultValue}], formula{numeratorKey,denominatorKey,label}}，指标与行业痛点一致\n` +
-              `只输出 JSON（不要 Markdown 代码块）。`,
-          },
-        ],
-      });
+      const userContentBase =
+        `请根据以下输入生成 DemoSpec JSON（严格遵守字段与类型）：\n` +
+        `${JSON.stringify(userPrompt, null, 2)}\n\n` +
+        `DemoSpec 结构要求（顶层键名必须完全一致）：\n` +
+        `- title: string(<=80)\n` +
+        `- summary: string(<=600)，需体现与当下 AI 发展相匹配的解决思路\n` +
+        `- planSteps: [{title,detail}] (3-8项)，detail<=200 字符；步骤之间要有递进\n` +
+        `- demoWidgets: 数组，至少各含一个 type 为 checklist 与 roiCalculator 的对象\n` +
+        `  - checklist: {type:'checklist', title, items: 3..12 个字符串}\n` +
+        `  - roiCalculator: {type:'roiCalculator', title, fields: 2..6 个 {label,key,defaultValue}；defaultValue 必须是数字；` +
+        `key 必须匹配 ^[a-z][a-z0-9_]{1,16}$（小写开头，仅 a-z0-9_）；` +
+        `formula: {numeratorKey,denominatorKey,label} 且两个 Key 必须出现在 fields 的 key 中\n` +
+        `只输出一个 JSON 对象，不要 Markdown 代码块或解释文字。`;
 
-      const text = resp.choices?.[0]?.message?.content ?? "";
-      modelUsed = resp.model ?? modelUsed;
-      let parsedJson: unknown;
-      try {
-        parsedJson = JSON.parse(text);
-      } catch {
-        // best-effort extraction if model wrapped JSON with extra text
-        const start = text.indexOf("{");
-        const end = text.lastIndexOf("}");
-        parsedJson = start >= 0 && end > start ? JSON.parse(text.slice(start, end + 1)) : null;
+      const model = process.env.OPENAI_MODEL ?? "gpt-4.1-mini";
+      const baseMessages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+        { role: "system", content: system },
+        { role: "user", content: userContentBase },
+      ];
+
+      const retryHint: OpenAI.Chat.ChatCompletionUserMessageParam = {
+        role: "user",
+        content:
+          "上次输出未通过服务端校验。请重新输出唯一一个 JSON 对象：顶层键为 title、summary、planSteps、demoWidgets；" +
+          "planSteps 每项只要 title 与 detail；roiCalculator 的 fields[].key 必须是小写字母开头且只含 a-z0-9_，" +
+          "fields[].defaultValue 必须是数字（不要加引号）；formula 的 numeratorKey、denominatorKey 必须与某两个 field 的 key 完全一致。",
+      };
+
+      let specFromAi: DemoSpec | null = null;
+
+      for (let aiAttempt = 0; aiAttempt < 2 && !specFromAi; aiAttempt++) {
+        const messages =
+          aiAttempt === 0 ? baseMessages : [...baseMessages, retryHint];
+
+        let resp: OpenAI.Chat.ChatCompletion;
+        try {
+          resp = await client.chat.completions.create({
+            model,
+            temperature: aiAttempt === 0 ? 0.4 : 0.25,
+            response_format: { type: "json_object" },
+            messages,
+          });
+        } catch (e) {
+          const msg = e instanceof Error ? e.message : String(e);
+          if (msg.includes("response_format") || msg.includes("json_object")) {
+            resp = await client.chat.completions.create({
+              model,
+              temperature: aiAttempt === 0 ? 0.4 : 0.25,
+              messages,
+            });
+          } else {
+            throw e;
+          }
+        }
+
+        const text = resp.choices?.[0]?.message?.content ?? "";
+        modelUsed = resp.model ?? modelUsed;
+
+        const jsonStr = extractJsonObject(text);
+        let parsedJson: unknown = null;
+        if (jsonStr) {
+          try {
+            parsedJson = JSON.parse(jsonStr);
+          } catch {
+            parsedJson = null;
+          }
+        }
+
+        const strict = parsedJson != null ? demoSpecSchema.safeParse(parsedJson) : null;
+        if (strict?.success) {
+          specFromAi = ensureWidgetMix(strict.data);
+          break;
+        }
+
+        if (parsedJson != null) {
+          const repaired = repairAiDemoSpec(parsedJson);
+          if (repaired) {
+            specFromAi = repaired;
+            break;
+          }
+        }
       }
-      const parsed = demoSpecSchema.safeParse(parsedJson);
-      if (!parsed.success) {
+
+      if (!specFromAi) {
         return NextResponse.json({ ok: false, error: "AI 输出格式异常，请稍后重试" }, { status: 502 });
       }
-      spec = ensureWidgetMix(parsed.data);
+      spec = specFromAi;
       markdown = `# ${spec.title}\n\n${spec.summary}\n`;
     }
 
