@@ -9,7 +9,7 @@ export default function Home() {
             扫码 → 输入问题 → 自动生成可分享 Demo
           </p>
           <h1 className="text-3xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            二维码获客：AI 方案 Demo 生成器
+            2026 春茗会：AI 方案 Demo 生成器
           </h1>
           <p className="text-base leading-7 text-zinc-600 dark:text-zinc-300">
             填写“我叫 / 行业 / 头疼问题”，系统会生成一个可打开的解决方案 Demo 页面，并提供固定链接
