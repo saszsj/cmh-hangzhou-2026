@@ -12,8 +12,9 @@ export default function Home() {
             2026 春茗会：AI 方案 Demo 生成器
           </h1>
           <p className="text-base leading-7 text-zinc-600 dark:text-zinc-300">
-            填写“我叫 / 行业 / 头疼问题”，系统会生成一个可打开的解决方案 Demo 页面，并提供固定链接
-            <span className="font-mono"> /&lt;拼音首字母&gt;</span> 方便你转发与复用。
+            填写“我叫 / 行业 / 头疼问题”，系统会结合大模型、智能体、知识库等当前主流的 AI
+            能力方向，生成可打开的解决方案 Demo 页面，并提供固定链接
+            <span className="font-mono"> /&lt;随机短链&gt;</span> 方便你转发与复用，他人无法从链接猜出身份。
           </p>
         </div>
 
@@ -24,12 +25,12 @@ export default function Home() {
           >
             立即生成一个 Demo
           </Link>
-          <a
+          <Link
             href="/new"
             className="inline-flex h-11 items-center justify-center rounded-full border border-zinc-200 bg-white px-6 text-sm font-semibold text-zinc-900 hover:bg-zinc-50 dark:border-zinc-800 dark:bg-zinc-950 dark:text-zinc-100 dark:hover:bg-zinc-900"
           >
             扫码入口（/new）
-          </a>
+          </Link>
         </div>
 
         <div className="mt-10 grid gap-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-6 dark:border-zinc-800 dark:bg-zinc-900/30 sm:grid-cols-[1fr_auto] sm:items-center">

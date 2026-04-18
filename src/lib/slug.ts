@@ -1,36 +1,29 @@
-import { pinyin } from "pinyin-pro";
+import { randomBytes } from "crypto";
 
-const RESERVED = new Set(["api", "new", "favicon.ico", "_next", "robots.txt", "sitemap.xml"]);
+const RESERVED = new Set([
+  "api",
+  "new",
+  "favicon.ico",
+  "_next",
+  "robots.txt",
+  "sitemap.xml",
+]);
 
-export function toPinyinInitials(inputName: string) {
-  const name = inputName.trim();
-  if (!name) return "";
+/** a-z and 0-9 for short, URL-safe paths */
+const ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 
-  const hasCjk = /[\u4E00-\u9FFF]/.test(name);
-  let raw = "";
-
-  if (hasCjk) {
-    raw = pinyin(name, { toneType: "none", type: "array" })
-      .map((syllable) => (syllable?.[0] ? syllable[0] : ""))
-      .join("");
-  } else {
-    raw = name;
+/**
+ * One random slug candidate (default length ≈ 52 bits entropy).
+ * Caller should check DB uniqueness and retry on collision.
+ */
+export function randomSlug(length = 10): string {
+  const bytes = randomBytes(length);
+  let out = "";
+  for (let i = 0; i < length; i++) {
+    out += ALPHABET[bytes[i]! % ALPHABET.length]!;
   }
-
-  const slug = raw
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "")
-    .slice(0, 12);
-
-  if (slug.length < 2) return "";
-  if (RESERVED.has(slug)) return "";
-  return slug;
+  if (RESERVED.has(out)) {
+    return randomSlug(length);
+  }
+  return out;
 }
-
-export function nextSlugCandidate(base: string, attempt: number) {
-  if (attempt <= 1) return base;
-  const suffix = String(attempt);
-  const trimmed = base.slice(0, Math.max(2, 12 - suffix.length));
-  return `${trimmed}${suffix}`;
-}
-

@@ -36,6 +36,9 @@ export default async function DemoPage({ params }: PageProps) {
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             解决方案 Demo
           </h1>
+          <p className="text-sm text-zinc-600 dark:text-zinc-400">
+            内容按当前可落地的 AI 能力（大模型、自动化与知识库等）组织，便于对外演示与讨论。
+          </p>
           {dbError ? (
             <p className="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
               服务器暂未配置数据库（{dbError}）。请先在部署环境设置 <span className="font-mono">DATABASE_URL</span>。
